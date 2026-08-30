@@ -1,0 +1,44 @@
+﻿# ============================================================
+# .gitignore — Fichiers et dossiers exclus du dépôt Git
+# ============================================================
+
+# ── Variables d'environnement (SECRETS) ──────────────────────
+# Ne jamais commiter des fichiers contenant des clés ou mots de passe
+.env
+.env.local
+.env.production
+.env.*.local
+backend/.env
+
+# ── Clés et certificats (SECRETS) ────────────────────────────
+*.key
+*.pem
+secrets.*
+
+# Fichiers de compte de service Google Cloud
+credentials.json
+*service-account*.json
+*-ocr-*.json
+
+# Dossier credentials du backend (contient la clé Google Cloud)
+backend/credentials/
+
+# ── Dépendances Node.js ──────────────────────────────────────
+node_modules/
+
+# ── Builds compilés (générés, pas à versionner) ──────────────
+frontend/dist/
+frontend/.vite/
+
+# ── Données et uploads (contenu utilisateur) ─────────────────
+# La base SQLite contient des données personnelles — non versionnée
+backend/data/
+# Les photos uploadées appartiennent à l'utilisateur — non versionnées
+backend/uploads/
+
+# ── Cache et artefacts divers ────────────────────────────────
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db
+*.log
