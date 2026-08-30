@@ -1,0 +1,18 @@
+{
+  "name": "recettes",
+  "version": "1.0.0",
+  "description": "Application personnelle de gestion de recettes de cuisine (PWA + backend Express/SQLite)",
+  "private": true,
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "start": "npm --workspace=backend start",
+    "dev": "npm --workspace=frontend run dev & npm --workspace=backend run dev",
+    "test": "npm --workspace=backend test && npm --workspace=frontend test --if-present"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC"
+}

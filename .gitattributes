@@ -1,0 +1,9 @@
+﻿# Normaliser les fins de ligne : LF dans le dépôt, conversion auto sur Windows
+* text=auto eol=lf
+
+# Fichiers binaires — pas de conversion
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.db binary
