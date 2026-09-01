@@ -34,6 +34,7 @@ const auth                = require('../middleware/auth');
 const { validatePhotoFile } = require('../validators/photoValidator');
 const { extractTextFromImage } = require('../services/ocrService');
 const { extractCandidateName } = require('../services/ocrNameExtractor');
+const { structureRecipeFromOcr } = require('../services/geminiService');
 const db                  = require('../db/database');
 
 const router = express.Router();
@@ -266,11 +267,24 @@ async function handlePhotoUpload(req, res, next) {
       });
     }
 
-    // ── Étape 4 : Extraction du nom candidat (Req. 3.1, 3.2) ─────────────────
+    // ── Étape 4 : Extraction du nom candidat (fallback) ──────────────────────
     // extractCandidateName extrait les 5 premiers mots non vides du texte OCR
     // et les concatène, avec troncature à 200 caractères.
     // Si le texte OCR est vide, retourne "".
     const suggestedName = extractCandidateName(ocrText);
+
+    // ── Étape 4bis : Structuration par Gemini ────────────────────────────────
+    // Si GEMINI_API_KEY est définie, on envoie le texte OCR à Gemini Flash
+    // pour obtenir une recette structurée (nom, ingrédients, instructions).
+    // En cas d'échec Gemini, on continue avec le fallback (suggestedName seul).
+    let structured = null;
+    if (process.env.GEMINI_API_KEY) {
+      try {
+        structured = await structureRecipeFromOcr(ocrText);
+      } catch (geminiErr) {
+        console.warn('[Photos] Gemini structuring failed, using fallback:', geminiErr.message);
+      }
+    }
 
     // ── Étape 5 : Création d'un brouillon de recette en base (Req. 1.8) ──────
     // La recette est créée avec :
@@ -285,24 +299,26 @@ async function handlePhotoUpload(req, res, next) {
     // Si le nom candidat est vide ou dupliqué, on génère un nom générique unique
     // horodaté. Cela garantit que le brouillon est toujours insérable sans erreur,
     // et l'utilisateur peut renommer la recette lors de l'édition.
-    let draftName = suggestedName.trim() || `Recette du ${new Date().toLocaleString('fr-FR')}`;
+    const finalName = (structured?.name?.trim()) || suggestedName.trim() || `Recette du ${new Date().toLocaleString('fr-FR')}`;
+    let draftName = finalName;
 
     // Préparer et exécuter l'INSERT avec un prepared statement (Req. 11.1)
+    const finalInstructions = structured?.instructions?.trim() || '';
     const insertRecipe = db.prepare(`
       INSERT INTO recipes (name, instructions, ocr_text, photo_path)
-      VALUES (?, '', ?, ?)
+      VALUES (?, ?, ?, ?)
     `);
 
     let recipeId;
     try {
-      const result = insertRecipe.run(draftName, ocrText, photoPath);
+      const result = insertRecipe.run(draftName, finalInstructions, ocrText, photoPath);
       recipeId = result.lastInsertRowid;
     } catch (dbErr) {
       // Collision de nom (UNIQUE constraint) très probable si l'utilisateur
       // envoie plusieurs photos rapidement. On retente avec un horodatage précis.
       if (dbErr.code === 'SQLITE_CONSTRAINT_UNIQUE' || dbErr.message?.includes('UNIQUE')) {
         const fallbackName = `Recette ${Date.now()}`;
-        const result = insertRecipe.run(fallbackName, ocrText, photoPath);
+        const result = insertRecipe.run(fallbackName, finalInstructions, ocrText, photoPath);
         recipeId = result.lastInsertRowid;
       } else {
         // Erreur DB inattendue → nettoyer le fichier et propager l'erreur
@@ -318,7 +334,8 @@ async function handlePhotoUpload(req, res, next) {
     return res.status(201).json({
       recipe_id:      recipeId,
       ocr_text:       ocrText,
-      suggested_name: suggestedName,
+      structured:     structured, // null si Gemini non disponible
+      suggested_name: structured?.name?.trim() || suggestedName,
     });
 
   } catch (err) {

@@ -72,6 +72,16 @@ onMounted(async () => {
   try {
     await recipesStore.fetchRecipe(recipeId.value)
     initialData.value = recipesStore.currentRecipe
+
+    // Fusionner les ingrédients Gemini si disponibles dans le state du router
+    // (passés depuis PhotoCaptureView après une analyse Gemini réussie)
+    const prefill = history.state?.prefill
+    if (prefill?.ingredients?.length) {
+      initialData.value = {
+        ...initialData.value,
+        ingredients: prefill.ingredients,
+      }
+    }
   } catch (err) {
     loadError.value = err.status === 404
       ? 'Cette recette est introuvable.'
