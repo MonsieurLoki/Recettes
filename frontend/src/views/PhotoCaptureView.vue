@@ -94,12 +94,9 @@
         <button class="btn btn-secondary" @click="resetCapture">
           ← Reprendre une photo
         </button>
-        <router-link
-          :to="`/recipes/${ocrResult.recipe_id}/edit`"
-          class="btn btn-primary"
-        >
+        <button class="btn btn-primary" @click="goToEdit">
           Créer la recette →
-        </router-link>
+        </button>
       </div>
     </section>
   </main>
@@ -107,8 +104,11 @@
 
 <script setup>
 import { ref } from 'vue'
+import { useRouter } from 'vue-router'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { apiFetch } from '@/services/api.js'
+
+const router = useRouter()
 
 const selectedFile = ref(null)
 const previewUrl = ref('')
@@ -167,6 +167,22 @@ async function uploadPhoto() {
   } finally {
     uploading.value = false
   }
+}
+
+function goToEdit() {
+  // Si Gemini a structuré la recette, on passe les données via le state du router
+  // pour pré-remplir le formulaire d'édition sans refaire d'appel API.
+  router.push({
+    path: `/recipes/${ocrResult.value.recipe_id}/edit`,
+    state: {
+      prefill: ocrResult.value.structured ? {
+        name: ocrResult.value.suggested_name,
+        instructions: ocrResult.value.structured.instructions || '',
+        ingredients: ocrResult.value.structured.ingredients || [],
+        ocr_text: ocrResult.value.ocr_text,
+      } : null
+    }
+  })
 }
 </script>
 
