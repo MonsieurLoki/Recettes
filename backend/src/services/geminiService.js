@@ -10,7 +10,7 @@
  *   sur des dizaines de cas limites. Gemini comprend le contexte et produit
  *   une structure fiable même avec des mises en page variées.
  *
- * Modèle utilisé : gemini-1.5-flash
+ * Modèle utilisé : gemini-2.0-flash
  *   Rapide, peu coûteux (~0.075$/million tokens), suffisant pour ce cas.
  */
 
@@ -38,7 +38,7 @@ async function structureRecipeFromOcr(ocrText) {
   }
 
   const genAI = new GoogleGenerativeAI(apiKey);
-  const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+  const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
 
   const prompt = `Tu es un assistant qui extrait des informations de recettes de cuisine.
 
