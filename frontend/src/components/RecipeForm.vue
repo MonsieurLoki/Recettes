@@ -152,7 +152,7 @@
 </template>
 
 <script setup>
-import { reactive, ref, onMounted } from 'vue'
+import { reactive, ref, onMounted, watch } from 'vue'
 import CategorySelector from '@/components/CategorySelector.vue'
 import { useCategoriesStore } from '@/stores/categories.js'
 import { useRecipesStore } from '@/stores/recipes.js'
@@ -196,26 +196,37 @@ const successMessage = ref('')
 
 // ── Initialisation en mode édition ─────────────────────────────────────────
 
+// Fonction partagée pour initialiser le formulaire depuis initialData
+function initFromData(data) {
+  if (!data) return
+  form.name = data.name ?? ''
+  form.instructions = data.instructions ?? ''
+  form.ingredients = data.ingredients?.length
+    ? data.ingredients.map(i => ({
+        name: i.name ?? '',
+        quantity: i.quantity ?? '',
+        unit: i.unit ?? '',
+      }))
+    : [{ name: '', quantity: '', unit: '' }]
+  form.category_ids = data.categories?.map(c => c.id) ?? []
+}
+
 onMounted(async () => {
   // Charger les catégories si pas encore disponibles
   if (categoriesStore.categories.length === 0) {
     await categoriesStore.fetchCategories()
   }
-
-  // Pré-remplir le formulaire si on est en mode édition
-  if (props.initialData) {
-    form.name = props.initialData.name ?? ''
-    form.instructions = props.initialData.instructions ?? ''
-    form.ingredients = props.initialData.ingredients?.length
-      ? props.initialData.ingredients.map(i => ({
-          name: i.name ?? '',
-          quantity: i.quantity ?? '',
-          unit: i.unit ?? '',
-        }))
-      : [{ name: '', quantity: '', unit: '' }]
-    form.category_ids = props.initialData.categories?.map(c => c.id) ?? []
-  }
+  initFromData(props.initialData)
 })
+
+// Watch pour détecter quand initialData change après le montage
+// (cas Gemini : RecipeEditView met à jour initialData avec les ingrédients
+// après fetchRecipe, ce qui se passe après le montage de RecipeForm)
+watch(() => props.initialData, (newData) => {
+  if (newData) {
+    initFromData(newData)
+  }
+}, { deep: true })
 
 // ── Gestion des ingrédients ─────────────────────────────────────────────────
 
