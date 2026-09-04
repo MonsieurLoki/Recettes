@@ -1,9 +1,39 @@
-# Steering — Recettes
+﻿# Steering — Recettes
 
 ## Contexte du projet
 Application personnelle de gestion de recettes de cuisine. Projet éducatif :
 le développeur est junior, le code doit être commenté et compréhensible,
 pas seulement fonctionnel.
+
+## État actuel (septembre 2026)
+Le MVP est **en production** sur https://recettes.critiq.ovh
+
+### Stack déployée
+- **Backend** : Node.js 22 + Express 4 + SQLite (better-sqlite3) — VPS OVH Debian 12, géré par PM2
+- **Frontend** : Vue 3 + Vite 5 + Pinia + Vue Router 4 — servi par Nginx, installable en PWA
+- **OCR** : Google Cloud Vision API (TEXT_DETECTION)
+- **Structuration IA** : Gemini 3.5 Flash (API AI Studio) — structure le texte OCR en recette JSON
+- **HTTPS** : Let's Encrypt via Certbot + Nginx
+- **Déploiement** : script `~/deploy.sh` sur le VPS (git pull + npm install + pm2 restart + vite build)
+
+### Fonctionnalités implémentées
+- Capture de recette par photo → OCR → Gemini → formulaire pré-rempli (nom + ingrédients + instructions)
+- CRUD complet des recettes (créer, lire, modifier, supprimer)
+- Catégorisation multi-catégories
+- Recherche par nom, ingrédient, catégorie (avec pagination)
+- Wake Lock sur la vue détail (écran allumé en cuisine)
+- PWA installable (manifest + service worker Workbox)
+- Mode hors ligne partiel (recettes récemment consultées disponibles sans réseau)
+- Protection par clé API (X-API-Key)
+
+### Variables d'environnement (VPS — backend/.env)
+- `API_KEY` : clé partagée frontend/backend
+- `GEMINI_API_KEY` : clé AI Studio pour la structuration Gemini
+- `GOOGLE_APPLICATION_CREDENTIALS` : chemin vers la clé JSON Google Cloud Vision
+- `PORT=3000`, `UPLOADS_DIR=./uploads`, `DB_PATH=./data/recettes.db`
+
+### Variables d'environnement (VPS — frontend/.env.production)
+- `VITE_API_KEY` : même valeur que API_KEY
 
 ## Langue
 - Toute l'interface utilisateur est en français.
@@ -19,8 +49,8 @@ pas seulement fonctionnel.
 - Une seule base de code pour mobile et desktop.
 
 ## Architecture
-- Backend séparé : stockage (base de données), logique métier, appel au
-  service OCR cloud.
+- Backend séparé : stockage (base de données), logique métier, appel aux
+  services cloud (OCR + Gemini).
 - Pas de système de comptes utilisateurs / authentification multi-utilisateur.
 - Usage strictement personnel (un seul utilisateur : le propriétaire).
 
@@ -37,12 +67,12 @@ pas seulement fonctionnel.
 ## Qualité et méthode
 - Développement piloté par les spécifications (specs Kiro) : Requirements
   → Design → Tasks, phase par phase, avec validation explicite à chaque étape.
-- Code testé (tests unitaires au minimum sur la logique métier et la
-  validation des entrées).
+- Code testé (280 tests backend : unitaires, intégration, property-based avec fast-check).
 - Documentation claire (README, commentaires pédagogiques dans le code).
-- Versionné avec Git, historique de commits propre et compréhensible.
+- Versionné avec Git sur GitHub (MonsieurLoki/Recettes), commits propres et compréhensibles.
+- Commits réguliers à chaque changement significatif + push vers GitHub.
 
-## Hors périmètre pour l'instant
-- Les fonctionnalités de suggestion de recettes / variantes et le futur
-  chatbot vocal sont des évolutions prévues mais traitées dans des specs
-  séparées, après le MVP de gestion de base des recettes.
+## Prochaines évolutions envisagées
+- Amélioration du design frontend (CSS global, thème cohérent, icônes PWA)
+- Nouvelles fonctionnalités à définir (suggestions de recettes, planning de repas, etc.)
+- Les fonctionnalités de chatbot vocal sont prévues dans des specs séparées.
