@@ -16,7 +16,10 @@
   <main class="home-view">
     <!-- ── En-tête ── -->
     <header class="home-header">
-      <h1 class="home-title">Mes recettes</h1>
+      <div class="home-heading">
+        <h1 class="home-title">Bonjour 👋</h1>
+        <p class="home-subtitle">Que cuisinez-vous aujourd'hui ?</p>
+      </div>
       <div class="header-actions">
         <router-link
           to="/capture"
@@ -229,27 +232,39 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* ── Mise en page générale ── */
+/* ── General layout ── */
 .home-view {
   max-width: 1100px;
   margin: 0 auto;
   padding: 24px 16px;
 }
 
-/* ── En-tête ── */
+/* ── Header ── */
 .home-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   flex-wrap: wrap;
   gap: 12px;
-  margin-bottom: 24px;
+  margin-bottom: 28px;
+}
+
+.home-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
 .home-title {
+  font-family: var(--font-heading);
   font-size: 1.75rem;
   font-weight: 700;
-  color: #111827;
+  color: var(--color-text);
+}
+
+.home-subtitle {
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
   margin: 0;
 }
 
@@ -259,7 +274,7 @@ onMounted(async () => {
   flex-wrap: wrap;
 }
 
-/* ── Boutons — surface tactile ≥ 44×44 px (Req. 9.5) ── */
+/* ── Buttons — touch target ≥ 44×44 px (Req. 9.5) ── */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -269,30 +284,31 @@ onMounted(async () => {
   padding: 10px 18px;
   font-size: 0.9375rem;
   font-weight: 500;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   text-decoration: none;
   border: none;
   cursor: pointer;
-  transition: background 0.15s ease;
+  transition: background 0.15s ease, box-shadow 0.15s ease;
 }
 
 .btn-primary {
-  background: #2d6a4f;
+  background: var(--color-primary);
   color: #ffffff;
 }
 
 .btn-primary:hover {
-  background: #1f4d38;
+  background: var(--color-primary-dark);
 }
 
 .btn-secondary {
-  background: #ffffff;
-  color: #374151;
-  border: 1px solid #d1d5db;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
 }
 
 .btn-secondary:hover:not(:disabled) {
-  background: #f9fafb;
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
 }
 
 .btn:disabled {
@@ -301,11 +317,11 @@ onMounted(async () => {
 }
 
 .btn:focus-visible {
-  outline: 2px solid #2d6a4f;
+  outline: 2px solid var(--color-primary);
   outline-offset: 2px;
 }
 
-/* ── Section de recherche ── */
+/* ── Search section ── */
 .search-section {
   margin-bottom: 24px;
   display: flex;
@@ -313,10 +329,11 @@ onMounted(async () => {
   gap: 12px;
 }
 
-/* ── Filtre par catégorie (détails/résumé accessible) ── */
+/* ── Category filter (accessible details/summary) ── */
 .category-filter {
-  border: 1px solid #e5e7eb;
-  border-radius: 6px;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
 }
 
 .category-filter-toggle {
@@ -327,18 +344,19 @@ onMounted(async () => {
   min-height: 44px; /* Req. 9.5 */
   font-weight: 500;
   font-size: 0.9375rem;
-  color: #374151;
+  color: var(--color-text);
   cursor: pointer;
-  list-style: none; /* masquer le triangle natif sur Chrome */
+  list-style: none; /* hide native triangle on Chrome */
   user-select: none;
 }
 
-/* Flèche personnalisée */
+/* Custom arrow */
 .category-filter-toggle::before {
   content: '▶';
   font-size: 0.625rem;
   transition: transform 0.2s ease;
   flex-shrink: 0;
+  color: var(--color-text-muted);
 }
 
 details[open] .category-filter-toggle::before {
@@ -356,36 +374,36 @@ details[open] .category-filter-toggle::before {
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
-  background: #2d6a4f;
+  background: var(--color-primary);
   color: #ffffff;
-  border-radius: 9999px;
+  border-radius: var(--radius-pill);
   font-size: 0.75rem;
   font-weight: 600;
 }
 
 .category-filter-body {
   padding: 12px 14px;
-  border-top: 1px solid #e5e7eb;
+  border-top: 1px solid var(--color-border);
 }
 
-/* ── Section résultats ── */
+/* ── Results section ── */
 .recipes-section {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-/* Grille responsive de RecipeCards */
+/* Responsive recipe card grid */
 .recipe-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 16px;
 }
 
-/* Message "aucune recette" (Req. 7.6) */
+/* "No recipes found" message (Req. 7.6) */
 .empty-msg {
   text-align: center;
-  color: #6b7280;
+  color: var(--color-text-muted);
   font-size: 1rem;
   padding: 48px 0;
 }
@@ -409,13 +427,13 @@ details[open] .category-filter-toggle::before {
 
 .page-info {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: var(--color-text-muted);
   white-space: nowrap;
 }
 
-/* ── Erreur globale ── */
+/* ── Global error ── */
 .error-msg {
-  color: #dc2626;
+  color: var(--color-danger);
   font-size: 0.875rem;
   margin-top: 16px;
   text-align: center;

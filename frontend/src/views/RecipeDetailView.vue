@@ -203,139 +203,252 @@ async function doDelete() {
   padding: 24px 16px;
 }
 
-.loading-center { display: flex; justify-content: center; padding: 80px 0; }
+.loading-center {
+  display: flex;
+  justify-content: center;
+  padding: 80px 0;
+}
 
 .error-block {
   text-align: center;
   padding: 40px 0;
-  color: #dc2626;
+  color: var(--color-danger);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 16px;
 }
 
-/* ── En-tête ── */
+/* ── Header ── */
 .back-link {
-  display: inline-block;
-  color: #2d6a4f;
+  display: inline-flex;
+  align-items: center;
+  color: var(--color-primary);
   text-decoration: none;
   font-size: 0.875rem;
-  margin-bottom: 16px;
+  font-weight: 500;
   min-height: 44px;
   line-height: 44px;
+  transition: color 0.15s ease;
 }
-.back-link:hover { text-decoration: underline; }
 
-.detail-header { display: flex; flex-direction: column; gap: 12px; margin-bottom: 32px; }
+.back-link:hover {
+  color: var(--color-primary-dark);
+  text-decoration: underline;
+}
+
+.detail-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 32px;
+}
 
 .detail-title {
+  font-family: var(--font-heading);
   font-size: 2rem;
   font-weight: 700;
-  color: #111827;
-  margin: 0;
+  color: var(--color-text);
   line-height: 1.3;
 }
 
-.detail-categories { display: flex; flex-wrap: wrap; gap: 6px; }
-
-.category-badge {
-  background: #d1fae5;
-  color: #065f46;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  font-size: 0.875rem;
-  font-weight: 500;
+.detail-categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
-.detail-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.category-badge {
+  background: var(--color-accent-light);
+  color: var(--color-secondary);
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 0.875rem;
+  font-weight: 600;
+  border: 1px solid #fde68a;
+}
 
-/* ── Boutons ── */
+.detail-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+/* ── Buttons ── */
 .btn {
   display: inline-flex;
   align-items: center;
+  gap: 6px;
   min-height: 44px;
   padding: 10px 18px;
   font-size: 0.9375rem;
   font-weight: 500;
-  border-radius: 6px;
+  border-radius: var(--radius-sm);
   text-decoration: none;
   border: none;
   cursor: pointer;
+  transition: background 0.15s ease;
 }
-.btn-secondary { background: #ffffff; color: #374151; border: 1px solid #d1d5db; }
-.btn-secondary:hover { background: #f9fafb; }
-.btn-danger { background: #dc2626; color: #ffffff; }
-.btn-danger:hover:not(:disabled) { background: #b91c1c; }
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-/* ── Sections ── */
-.detail-section { margin-bottom: 32px; }
+.btn-secondary {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+}
+
+.btn-secondary:hover {
+  background: var(--color-primary-light);
+  border-color: var(--color-primary);
+}
+
+.btn-danger {
+  background: var(--color-danger);
+  color: #ffffff;
+}
+
+.btn-danger:hover:not(:disabled) {
+  background: #b91c1c;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn:focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
+/* ── Content sections ── */
+.detail-section {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  margin-bottom: 20px;
+}
 
 .section-title {
+  font-family: var(--font-heading);
   font-size: 1.25rem;
-  font-weight: 600;
-  color: #111827;
-  margin: 0 0 14px;
-  padding-bottom: 8px;
-  border-bottom: 2px solid #e5e7eb;
+  font-weight: 700;
+  color: var(--color-primary);
+  margin: 0 0 16px;
+  padding-bottom: 10px;
+  border-bottom: 2px solid var(--color-border);
 }
 
-/* ── Ingrédients ── */
-.ingredient-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+/* ── Ingredients ── */
+.ingredient-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
 
 .ingredient-item {
   display: flex;
-  gap: 8px;
-  font-size: 1rem;  /* ≥ 16 px (Req. 8.3) */
-  color: #374151;
+  gap: 10px;
+  font-size: 1rem; /* ≥ 16 px (Req. 8.3) */
+  color: var(--color-text);
   line-height: 1.6;
+  padding: 6px 0;
+  border-bottom: 1px solid var(--color-bg);
 }
 
-.ingredient-qty { font-weight: 600; color: #2d6a4f; min-width: 60px; }
-.ingredient-name { flex: 1; }
+.ingredient-item:last-child {
+  border-bottom: none;
+}
+
+/* Quantity displayed in accent color */
+.ingredient-qty {
+  font-weight: 600;
+  color: var(--color-secondary);
+  min-width: 72px;
+  flex-shrink: 0;
+}
+
+.ingredient-name {
+  flex: 1;
+}
 
 /* ── Instructions ── */
 .instruction-list {
   margin: 0;
-  padding-left: 28px;
+  padding-left: 0;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
+  list-style: none;
+  counter-reset: step-counter;
 }
 
 .instruction-step {
+  display: flex;
+  gap: 14px;
   font-size: 1rem; /* ≥ 16 px */
-  color: #374151;
+  color: var(--color-text);
   line-height: 1.7;
+  counter-increment: step-counter;
 }
 
-.empty-instructions { color: #6b7280; font-style: italic; font-size: 1rem; }
+/* Custom step number */
+.instruction-step::before {
+  content: counter(step-counter);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  background: var(--color-primary);
+  color: #ffffff;
+  border-radius: var(--radius-pill);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+  margin-top: 2px;
+}
 
-/* ── Dialogue de confirmation ── */
+.empty-instructions {
+  color: var(--color-text-muted);
+  font-style: italic;
+  font-size: 1rem;
+}
+
+/* ── Delete confirmation dialog ── */
 .confirm-dialog {
   position: fixed;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   border: none;
-  border-radius: 10px;
+  border-radius: var(--radius-lg);
   padding: 28px;
   max-width: 420px;
   width: 90%;
-  box-shadow: 0 20px 60px rgba(0,0,0,0.3);
-  background: #ffffff;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25);
+  background: var(--color-surface);
   z-index: 100;
 }
 
-.confirm-dialog::backdrop { background: rgba(0,0,0,0.5); }
+.confirm-dialog::backdrop {
+  background: rgba(0, 0, 0, 0.5);
+}
 
 .dialog-message {
   font-size: 1rem;
-  color: #374151;
+  color: var(--color-text);
   line-height: 1.6;
   margin: 0 0 20px;
 }
 
-.dialog-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
 </style>

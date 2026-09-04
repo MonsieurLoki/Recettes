@@ -12,6 +12,7 @@
   "license": "ISC",
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.2.4",
+    "sharp": "^0.35.4",
     "vite": "^5.4.21",
     "vite-plugin-pwa": "^0.20.5",
     "workbox-cacheable-response": "^7.4.1",
