@@ -107,8 +107,10 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import LoadingSpinner from '@/components/LoadingSpinner.vue'
 import { apiFetch } from '@/services/api.js'
+import { useRecipesStore } from '@/stores/recipes.js'
 
 const router = useRouter()
+const recipesStore = useRecipesStore()
 
 const selectedFile = ref(null)
 const previewUrl = ref('')
@@ -170,19 +172,19 @@ async function uploadPhoto() {
 }
 
 function goToEdit() {
-  // Si Gemini a structuré la recette, on passe les données via le state du router
-  // pour pré-remplir le formulaire d'édition sans refaire d'appel API.
-  router.push({
-    path: `/recipes/${ocrResult.value.recipe_id}/edit`,
-    state: {
-      prefill: ocrResult.value.structured ? {
-        name: ocrResult.value.suggested_name,
-        instructions: ocrResult.value.structured.instructions || '',
-        ingredients: ocrResult.value.structured.ingredients || [],
-        ocr_text: ocrResult.value.ocr_text,
-      } : null
-    }
-  })
+  // Si Gemini a structuré la recette, stocker les données dans le store Pinia
+  // pour pré-remplir le formulaire d'édition. On utilise le store plutôt que
+  // history.state car Vue Router 4 fusionne son propre état avec history.state,
+  // ce qui le rend non fiable en contexte PWA (notamment sur Safari).
+  if (ocrResult.value.structured) {
+    recipesStore.setPendingPrefill({
+      name: ocrResult.value.suggested_name,
+      instructions: ocrResult.value.structured.instructions || '',
+      ingredients: ocrResult.value.structured.ingredients || [],
+      ocr_text: ocrResult.value.ocr_text,
+    })
+  }
+  router.push(`/recipes/${ocrResult.value.recipe_id}/edit`)
 }
 </script>
 

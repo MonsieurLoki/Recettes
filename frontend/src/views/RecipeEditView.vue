@@ -73,14 +73,18 @@ onMounted(async () => {
     await recipesStore.fetchRecipe(recipeId.value)
     initialData.value = recipesStore.currentRecipe
 
-    // Fusionner les ingrédients Gemini si disponibles dans le state du router
-    // (passés depuis PhotoCaptureView après une analyse Gemini réussie)
-    const prefill = history.state?.prefill
+    // Fusionner les ingrédients Gemini si disponibles dans le store
+    // (déposés par PhotoCaptureView après une analyse Gemini réussie).
+    // Le store est plus fiable que history.state en contexte PWA / Safari,
+    // car Vue Router 4 fusionne son propre état dans history.state.
+    const prefill = recipesStore.pendingPrefill
     if (prefill?.ingredients?.length) {
       initialData.value = {
         ...initialData.value,
         ingredients: prefill.ingredients,
       }
+      // Nettoyer après utilisation pour éviter une ré-application au prochain montage
+      recipesStore.clearPendingPrefill()
     }
   } catch (err) {
     loadError.value = err.status === 404

@@ -2,19 +2,24 @@
  * stores/recipes.js — Store Pinia pour la gestion des recettes
  *
  * État :
- *   recipes       : tableau de résumés de recettes (liste)
- *   currentRecipe : recette complète actuellement consultée/éditée
- *   total         : nombre total de recettes correspondant aux filtres actifs
- *   page          : page courante (pagination)
- *   loading       : indicateur de chargement
- *   error         : message d'erreur global
+ *   recipes        : tableau de résumés de recettes (liste)
+ *   currentRecipe  : recette complète actuellement consultée/éditée
+ *   total          : nombre total de recettes correspondant aux filtres actifs
+ *   page           : page courante (pagination)
+ *   loading        : indicateur de chargement
+ *   error          : message d'erreur global
+ *   pendingPrefill : données Gemini temporaires à pré-remplir dans RecipeEditView
+ *                    (canal de communication entre PhotoCaptureView et RecipeEditView,
+ *                    plus fiable que history.state en contexte PWA)
  *
  * Actions :
- *   fetchRecipes(filters)  : charger la liste avec filtres optionnels
- *   fetchRecipe(id)        : charger une recette complète par ID
- *   createRecipe(body)     : créer une nouvelle recette
- *   updateRecipe(id, body) : mettre à jour une recette existante
- *   deleteRecipe(id)       : supprimer une recette
+ *   fetchRecipes(filters)      : charger la liste avec filtres optionnels
+ *   fetchRecipe(id)            : charger une recette complète par ID
+ *   createRecipe(body)         : créer une nouvelle recette
+ *   updateRecipe(id, body)     : mettre à jour une recette existante
+ *   deleteRecipe(id)           : supprimer une recette
+ *   setPendingPrefill(data)    : stocker les données de pré-remplissage Gemini
+ *   clearPendingPrefill()      : effacer les données après utilisation
  */
 import { defineStore } from 'pinia'
 import { ref } from 'vue'
@@ -28,6 +33,18 @@ export const useRecipesStore = defineStore('recipes', () => {
   const page = ref(1)
   const loading = ref(false)
   const error = ref(null)
+
+  /**
+   * pendingPrefill — Données Gemini à pré-remplir dans RecipeEditView.
+   *
+   * Utilisé comme canal de communication entre PhotoCaptureView (producteur)
+   * et RecipeEditView (consommateur). On préfère le store à history.state
+   * car history.state est fusionné par Vue Router 4 et peut être inaccessible
+   * dans certains contextes PWA / Safari.
+   *
+   * Structure : { name, instructions, ingredients, ocr_text } | null
+   */
+  const pendingPrefill = ref(null)
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
@@ -150,5 +167,26 @@ export const useRecipesStore = defineStore('recipes', () => {
     }
   }
 
-  return { recipes, currentRecipe, total, page, loading, error, fetchRecipes, fetchRecipe, createRecipe, updateRecipe, deleteRecipe }
+  /**
+   * setPendingPrefill — Stocke les données Gemini à pré-remplir.
+   *
+   * Appelé par PhotoCaptureView juste avant la navigation vers RecipeEditView.
+   *
+   * @param {{ name: string, instructions: string, ingredients: string[], ocr_text: string }} data
+   */
+  function setPendingPrefill(data) {
+    pendingPrefill.value = data
+  }
+
+  /**
+   * clearPendingPrefill — Efface les données de pré-remplissage.
+   *
+   * Appelé par RecipeEditView après avoir consommé les données,
+   * pour éviter qu'un rechargement ultérieur ne les réapplique.
+   */
+  function clearPendingPrefill() {
+    pendingPrefill.value = null
+  }
+
+  return { recipes, currentRecipe, total, page, loading, error, pendingPrefill, fetchRecipes, fetchRecipe, createRecipe, updateRecipe, deleteRecipe, setPendingPrefill, clearPendingPrefill }
 })
