@@ -37,9 +37,10 @@ const fs = require('fs');
 // dotenv doit avoir été chargé avant ce module (dans app.js).
 const dbPath = process.env.DB_PATH || path.join(__dirname, '../../data/recettes.db');
 
-// Chemin vers le fichier de migration initial.
-// Ce fichier est versionné dans le dépôt et décrit le schéma complet.
-const migrationPath = path.join(__dirname, 'migrations', '001_initial.sql');
+// Directory containing all SQL migration files.
+// Each file is named with a numeric prefix (e.g. 001_initial.sql, 002_enhancements.sql)
+// so lexicographic sorting gives the correct execution order.
+const migrationsDir = path.join(__dirname, 'migrations');
 
 /**
  * Ouvre (ou crée) la base de données SQLite au chemin spécifié.
@@ -62,29 +63,64 @@ const db = new Database(dbPath, {
 db.pragma('foreign_keys = ON');
 
 /**
- * Exécute le fichier de migration 001_initial.sql si les tables n'existent
- * pas encore.
+ * Runs all *.sql migration files found in the migrations/ directory,
+ * in lexicographic order (001_initial.sql before 002_enhancements.sql, etc.).
  *
- * La migration est idempotente grâce aux clauses `IF NOT EXISTS` dans le SQL.
- * On peut l'appeler à chaque démarrage sans risque d'erreur ni de perte de données.
+ * Each file is split into individual statements on semicolons and executed
+ * one by one. This per-statement approach lets us make migrations idempotent:
+ * "duplicate column name" errors from ALTER TABLE statements are silently
+ * ignored so re-running on an already-migrated database is safe. All other
+ * errors are re-thrown to fail fast on genuine problems (syntax errors,
+ * constraint violations, etc.).
  */
 function runMigrations() {
-  if (!fs.existsSync(migrationPath)) {
-    throw new Error(
-      `Fichier de migration introuvable : ${migrationPath}\n` +
-      'Assurez-vous que backend/src/db/migrations/001_initial.sql existe.'
-    );
+  // List all .sql files and sort them so they run in the right order.
+  const files = fs.readdirSync(migrationsDir)
+    .filter(f => f.endsWith('.sql'))
+    .sort(); // lexicographic order: 001_initial.sql before 002_enhancements.sql
+
+  for (const file of files) {
+    const filePath = path.join(migrationsDir, file);
+    const sql = fs.readFileSync(filePath, 'utf8');
+
+    // Split on semicolons to get individual statements.
+    // We must strip single-line SQL comments (-- ... ) first because some
+    // comments in 001_initial.sql contain semicolons (e.g. "archive ; peut
+    // être NULL"), which would produce spurious fragments if we split first.
+    // After stripping comments we split on ";", trim, and drop empty strings.
+    const stripped = sql
+      .split('\n')
+      .map(line => {
+        const commentStart = line.indexOf('--');
+        return commentStart >= 0 ? line.substring(0, commentStart) : line;
+      })
+      .join('\n');
+
+    const statements = stripped
+      .split(';')
+      .map(s => s.trim())
+      .filter(s => s.length > 0);
+
+    for (const statement of statements) {
+      try {
+        db.exec(statement);
+      } catch (err) {
+        // SQLite raises an error when trying to add a column that already exists.
+        // This happens when the migration is run again on an already-migrated DB.
+        // We silently ignore "duplicate column name" errors to make the runner idempotent.
+        // All other errors (syntax errors, constraint violations, etc.) are re-thrown.
+        if (err.message && err.message.includes('duplicate column name')) {
+          // Column already exists — safe to ignore.
+          continue;
+        }
+        throw err;
+      }
+    }
   }
-
-  const sql = fs.readFileSync(migrationPath, 'utf8');
-
-  // exec() exécute plusieurs instructions SQL séparées par des points-virgules,
-  // ce qui est nécessaire pour un fichier de migration complet.
-  db.exec(sql);
 }
 
-// Exécuter les migrations au chargement du module.
-// Toute erreur ici doit faire échouer le démarrage du serveur.
+// Run all migrations when the module is loaded.
+// Any error here should crash the server immediately — a bad schema is not recoverable.
 runMigrations();
 
 /**

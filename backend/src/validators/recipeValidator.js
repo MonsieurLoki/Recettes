@@ -196,6 +196,66 @@ function validateCategoryIds(categoryIds) {
   return null; // valide
 }
 
+/**
+ * Valide le champ `servings` (portions).
+ * Règles : optionnel ; si présent, doit être un entier entre 1 et 100.
+ * (Requirements 1.4, 1.5)
+ *
+ * @param {any} value - Valeur soumise
+ * @returns {string|null} Message d'erreur, ou null si valide
+ */
+function validateServings(value) {
+  if (value === undefined || value === null || value === '') {
+    return null; // optionnel
+  }
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1 || n > 100) {
+    return 'Les portions doivent être un entier entre 1 et 100.';
+  }
+  return null;
+}
+
+/**
+ * Valide un champ de durée en minutes (prep_time ou cook_time).
+ * Règles : optionnel ; si présent, doit être un entier ≥ 1.
+ * (Requirements 3.3, 3.4)
+ *
+ * @param {string} fieldName - Nom du champ pour le message d'erreur
+ * @param {any}    value     - Valeur soumise
+ * @returns {string|null} Message d'erreur, ou null si valide
+ */
+function validatePositiveInteger(fieldName, value) {
+  if (value === undefined || value === null || value === '') {
+    return null; // optionnel
+  }
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1) {
+    return `${fieldName} doit être un entier positif (en minutes).`;
+  }
+  return null;
+}
+
+/**
+ * Valide le champ `notes`.
+ * Règles : optionnel ; si présent, ≤ 2000 caractères.
+ * (Requirements 9.2, 9.3)
+ *
+ * @param {any} value - Valeur soumise
+ * @returns {string|null} Message d'erreur, ou null si valide
+ */
+function validateNotes(value) {
+  if (value === undefined || value === null) {
+    return null; // optionnel
+  }
+  if (typeof value !== 'string') {
+    return 'Les notes doivent être une chaîne de caractères.';
+  }
+  if (value.length > 2000) {
+    return 'Les notes ne peuvent pas dépasser 2000 caractères.';
+  }
+  return null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Fonctions exportées
 // ─────────────────────────────────────────────────────────────────────────────
@@ -231,6 +291,19 @@ function validateCreateRecipe(body, db) {
   // Validation des catégories (Requirement 5.2)
   const categoryIdsError = validateCategoryIds(body.category_ids);
   if (categoryIdsError) errors.category_ids = categoryIdsError;
+
+  // Validation des nouvelles colonnes optionnelles (Requirements 1.4, 3.3, 9.2)
+  const servingsError = validateServings(body.servings);
+  if (servingsError) errors.servings = servingsError;
+
+  const prepTimeError = validatePositiveInteger('Le temps de préparation', body.prep_time);
+  if (prepTimeError) errors.prep_time = prepTimeError;
+
+  const cookTimeError = validatePositiveInteger('Le temps de cuisson', body.cook_time);
+  if (cookTimeError) errors.cook_time = cookTimeError;
+
+  const notesError = validateNotes(body.notes);
+  if (notesError) errors.notes = notesError;
 
   if (Object.keys(errors).length > 0) {
     return { valid: false, errors };
@@ -274,6 +347,19 @@ function validateUpdateRecipe(id, body, db) {
   // Validation des catégories (Requirement 5.2)
   const categoryIdsError = validateCategoryIds(body.category_ids);
   if (categoryIdsError) errors.category_ids = categoryIdsError;
+
+  // Validation des nouvelles colonnes optionnelles (Requirements 1.4, 3.3, 9.2)
+  const servingsError = validateServings(body.servings);
+  if (servingsError) errors.servings = servingsError;
+
+  const prepTimeError = validatePositiveInteger('Le temps de préparation', body.prep_time);
+  if (prepTimeError) errors.prep_time = prepTimeError;
+
+  const cookTimeError = validatePositiveInteger('Le temps de cuisson', body.cook_time);
+  if (cookTimeError) errors.cook_time = cookTimeError;
+
+  const notesError = validateNotes(body.notes);
+  if (notesError) errors.notes = notesError;
 
   if (Object.keys(errors).length > 0) {
     return { valid: false, errors };

@@ -29,7 +29,7 @@ const { GoogleGenerativeAI } = require('@google/generative-ai');
  */
 async function structureRecipeFromOcr(ocrText) {
   if (!ocrText || !ocrText.trim()) {
-    return { name: '', ingredients: [], instructions: '' };
+    return { name: '', ingredients: [], instructions: '', prep_time: null, cook_time: null };
   }
 
   const apiKey = process.env.GEMINI_API_KEY;
@@ -54,12 +54,16 @@ Extrais les informations et retourne UNIQUEMENT un objet JSON valide avec cette 
   "ingredients": [
     { "name": "nom ingrédient", "quantity": "quantité ou null", "unit": "unité ou null" }
   ],
-  "instructions": "étapes de préparation en texte libre, séparées par des sauts de ligne"
+  "instructions": "étapes de préparation en texte libre, séparées par des sauts de ligne",
+  "prep_time": 20,
+  "cook_time": 45
 }
 
 Règles :
-- Si une information est absente ou illisible, utilise une chaîne vide "" ou un tableau vide []
+- Si une information est absente ou illisible, utilise une chaîne vide "" ou un tableau vide [] ou null
 - Pour les ingrédients sans quantité ou unité, utilise null
+- prep_time : temps de préparation en minutes (entier). Si exprimé en heures et minutes (ex. "1 h 30 min"), convertis en minutes totales (90). Si absent, utilise null.
+- cook_time : temps de cuisson en minutes (entier). Même règle de conversion. Si absent, utilise null.
 - Retourne UNIQUEMENT le JSON, sans texte avant ou après, sans blocs de code markdown
 - Les instructions doivent être en français si possible`;
 
@@ -79,6 +83,8 @@ Règles :
       name: '',
       ingredients: [],
       instructions: ocrText, // fallback : mettre le texte OCR dans les instructions
+      prep_time: null,
+      cook_time: null,
     };
   }
 
@@ -86,6 +92,8 @@ Règles :
     name:         typeof parsed.name         === 'string' ? parsed.name.slice(0, 200) : '',
     ingredients:  Array.isArray(parsed.ingredients) ? parsed.ingredients : [],
     instructions: typeof parsed.instructions === 'string' ? parsed.instructions : '',
+    prep_time:    Number.isInteger(parsed.prep_time) && parsed.prep_time >= 1 ? parsed.prep_time : null,
+    cook_time:    Number.isInteger(parsed.cook_time) && parsed.cook_time >= 1 ? parsed.cook_time : null,
   };
 }
 

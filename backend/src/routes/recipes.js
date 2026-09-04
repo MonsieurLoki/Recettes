@@ -77,9 +77,13 @@ router.use(auth);
 function getRecipeById(id) {
   // Récupération des champs de la recette elle-même.
   // Prepared statement avec ? pour éviter toute injection SQL (Req. 11.1).
+  // Inclut les nouveaux champs ajoutés par la migration 002 :
+  // servings, prep_time, cook_time, notes (Requirements 1.8, 3.8, 9.6).
   const recipe = db
     .prepare(
-      `SELECT id, name, instructions, ocr_text, photo_path, created_at, updated_at
+      `SELECT id, name, instructions, ocr_text, photo_path,
+              servings, prep_time, cook_time, notes,
+              created_at, updated_at
        FROM recipes WHERE id = ?`
     )
     .get(id);
@@ -221,6 +225,20 @@ router.get('/', (req, res, next) => {
         .filter((n) => Number.isInteger(n) && n > 0);
     }
 
+    // max_time filter: optional positive integer (total time in minutes)
+    // (Requirement 5.3, 5.4)
+    let maxTime = null;
+    if (req.query.max_time !== undefined) {
+      const mt = parseInt(req.query.max_time, 10);
+      if (isNaN(mt) || mt <= 0) {
+        return res.status(400).json({
+          error: 'Paramètres de recherche invalides',
+          details: { max_time: 'max_time doit être un entier positif (minutes).' },
+        });
+      }
+      maxTime = mt;
+    }
+
     // ── Étape 3 : construction dynamique de la requête SQL ─────────────────
     //
     // Pourquoi construire la requête dynamiquement ?
@@ -281,6 +299,19 @@ router.get('/', (req, res, next) => {
       params.push(...categoryIds, categoryIds.length);
     }
 
+    if (maxTime !== null) {
+      // Recettes dont le temps total ≤ maxTime, OR recettes sans aucun temps
+      // renseigné (toujours incluses — Req. 5.3).
+      // COALESCE(x, 0) traite un champ NULL comme 0 pour le calcul du total.
+      conditions.push(
+        `(
+           (r.prep_time IS NOT NULL OR r.cook_time IS NOT NULL)
+           AND COALESCE(r.prep_time, 0) + COALESCE(r.cook_time, 0) <= ?
+         ) OR (r.prep_time IS NULL AND r.cook_time IS NULL)`
+      );
+      params.push(maxTime);
+    }
+
     const whereClause = conditions.length > 0
       ? `WHERE ${conditions.join(' AND ')}`
       : '';
@@ -293,14 +324,21 @@ router.get('/', (req, res, next) => {
     `;
 
     // Requête principale : on récupère les champs résumés des recettes
-    // (sans instructions, ocr_text, photo_path — non nécessaires pour la liste).
+    // (sans instructions, ocr_text — non nécessaires pour la liste).
+    // Les nouveaux champs photo_path, servings, prep_time, cook_time sont
+    // inclus pour permettre l'affichage des miniatures et du temps sur les cartes
+    // (Requirements 1.9, 3.9, 5.4, 8.8).
     // Les catégories sont agrégées en JSON pour éviter N+1 requêtes.
-    // GROUP_CONCAT produit une chaîne "id:nom,id:nom,..." qu'on parse côté JS.
+    // GROUP_CONCAT produit une chaîne "id:nom||id:nom,..." qu'on parse côté JS.
     const dataSql = `
       SELECT
         r.id,
         r.name,
         r.updated_at,
+        r.photo_path,
+        r.servings,
+        r.prep_time,
+        r.cook_time,
         GROUP_CONCAT(c.id || ':' || c.name, '||') AS categories_raw
       FROM recipes r
       LEFT JOIN recipe_categories rc ON rc.recipe_id = r.id
@@ -332,6 +370,10 @@ router.get('/', (req, res, next) => {
         id: row.id,
         name: row.name,
         categories,
+        photo_path: row.photo_path ?? null,
+        servings: row.servings ?? 4,
+        prep_time: row.prep_time ?? null,
+        cook_time: row.cook_time ?? null,
         updated_at: row.updated_at,
       };
     });
@@ -438,6 +480,15 @@ router.post('/', (req, res, next) => {
     const sanitizedInstructions = sanitizeText(req.body.instructions);
     const categoryIds           = req.body.category_ids || [];
 
+    // Lecture des nouveaux champs optionnels (Requirements 1.3, 3.6, 3.7, 9.4, 9.5).
+    // servings : entier 1–100, défaut 4 si absent ou vide.
+    // prep_time / cook_time : entiers positifs en minutes, NULL si absents.
+    // notes : texte libre ≤ 2000 car., sanitisé ; NULL si absent.
+    const servings       = (req.body.servings  != null && req.body.servings  !== '') ? parseInt(req.body.servings,  10) : 4;
+    const prepTime       = (req.body.prep_time != null && req.body.prep_time !== '') ? parseInt(req.body.prep_time, 10) : null;
+    const cookTime       = (req.body.cook_time != null && req.body.cook_time !== '') ? parseInt(req.body.cook_time, 10) : null;
+    const sanitizedNotes = req.body.notes != null ? sanitizeText(String(req.body.notes)) : null;
+
     // ── Étape 3 : transaction atomique ────────────────────────────────────
     // Pourquoi une transaction ?
     // Sans transaction, une erreur lors de l'insertion des ingrédients
@@ -446,12 +497,14 @@ router.post('/', (req, res, next) => {
     // toutes les opérations dans un BEGIN/COMMIT et rollback en cas d'exception.
     const createRecipe = db.transaction(() => {
       // Insertion de la recette principale (Requirement 5.1)
+      // Les quatre nouveaux champs sont inclus pour satisfaire les colonnes
+      // ajoutées par la migration 002 (Requirements 1.3, 3.6, 9.4).
       const result = db
         .prepare(
-          `INSERT INTO recipes (name, instructions)
-           VALUES (?, ?)`
+          `INSERT INTO recipes (name, instructions, servings, prep_time, cook_time, notes)
+           VALUES (?, ?, ?, ?, ?, ?)`
         )
-        .run(sanitizedName, sanitizedInstructions);
+        .run(sanitizedName, sanitizedInstructions, servings, prepTime, cookTime, sanitizedNotes);
 
       const newId = result.lastInsertRowid;
 
@@ -513,7 +566,9 @@ router.put('/:id', (req, res, next) => {
     }
 
     // ── Étape 1 : vérifier que la recette existe ──────────────────────────
-    const existing = db.prepare('SELECT id FROM recipes WHERE id = ?').get(id);
+    // On lit aussi `servings` ici pour pouvoir préserver la valeur existante
+    // si le client ne soumet pas ce champ (Requirement 1.7).
+    const existing = db.prepare('SELECT id, servings FROM recipes WHERE id = ?').get(id);
     if (!existing) {
       return res.status(404).json({ error: 'Recette introuvable.' });
     }
@@ -537,6 +592,15 @@ router.put('/:id', (req, res, next) => {
     const sanitizedInstructions = sanitizeText(req.body.instructions);
     const categoryIds           = req.body.category_ids || [];
 
+    // Lecture des nouveaux champs optionnels (Requirements 1.6, 1.7, 3.3, 3.4, 9.4, 9.5).
+    // servings : préserve la valeur existante en base si absent du body.
+    // prep_time / cook_time : NULL si absents (les remplace toujours).
+    // notes : NULL si absent.
+    const servings       = (req.body.servings  != null && req.body.servings  !== '') ? parseInt(req.body.servings,  10) : (existing?.servings ?? 4);
+    const prepTime       = (req.body.prep_time != null && req.body.prep_time !== '') ? parseInt(req.body.prep_time, 10) : null;
+    const cookTime       = (req.body.cook_time != null && req.body.cook_time !== '') ? parseInt(req.body.cook_time, 10) : null;
+    const sanitizedNotes = req.body.notes != null ? sanitizeText(String(req.body.notes)) : null;
+
     // ── Étape 4 : transaction atomique ────────────────────────────────────
     // Stratégie DELETE + INSERT pour les ingrédients et catégories :
     // Plutôt que de calculer les différences entre l'état actuel et le nouvel
@@ -550,12 +614,14 @@ router.put('/:id', (req, res, next) => {
     // manuellement). (Requirement 11.1)
     const updateRecipe = db.transaction(() => {
       // Mise à jour des champs de la recette principale.
+      // Les quatre nouveaux champs sont inclus (Requirements 1.6, 3.3, 9.4).
       // updated_at est rafraîchi via strftime pour rester en ISO 8601.
       db.prepare(
         `UPDATE recipes
-         SET name = ?, instructions = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+         SET name = ?, instructions = ?, servings = ?, prep_time = ?, cook_time = ?, notes = ?,
+             updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
          WHERE id = ?`
-      ).run(sanitizedName, sanitizedInstructions, id);
+      ).run(sanitizedName, sanitizedInstructions, servings, prepTime, cookTime, sanitizedNotes, id);
 
       // Suppression des anciens ingrédients (DELETE explicite car ingredients
       // n'a pas ON DELETE CASCADE sur recipe_id — la cascade est sur la

@@ -128,6 +128,46 @@
       </p>
     </div>
 
+    <!-- ── Temps et portions ── -->
+    <div class="form-row-3">
+      <div class="form-field">
+        <label for="recipe-servings" class="field-label">Portions</label>
+        <input
+          id="recipe-servings"
+          v-model.number="form.servings"
+          type="number"
+          min="1"
+          max="100"
+          class="field-input"
+          aria-label="Nombre de portions"
+        />
+      </div>
+      <div class="form-field">
+        <label for="recipe-prep-time" class="field-label">Préparation (min)</label>
+        <input
+          id="recipe-prep-time"
+          v-model.number="form.prep_time"
+          type="number"
+          min="1"
+          placeholder="minutes"
+          class="field-input"
+          aria-label="Temps de préparation en minutes"
+        />
+      </div>
+      <div class="form-field">
+        <label for="recipe-cook-time" class="field-label">Cuisson (min)</label>
+        <input
+          id="recipe-cook-time"
+          v-model.number="form.cook_time"
+          type="number"
+          min="1"
+          placeholder="minutes"
+          class="field-input"
+          aria-label="Temps de cuisson en minutes"
+        />
+      </div>
+    </div>
+
     <!-- ── Erreur globale ── -->
     <p v-if="globalError" class="global-error" role="alert">
       {{ globalError }}
@@ -182,6 +222,9 @@ const form = reactive({
   instructions: '',
   ingredients: [{ name: '', quantity: '', unit: '' }],
   category_ids: [],
+  servings: 4,
+  prep_time: null,
+  cook_time: null,
 })
 
 const errors = reactive({
@@ -209,6 +252,9 @@ function initFromData(data) {
       }))
     : [{ name: '', quantity: '', unit: '' }]
   form.category_ids = data.categories?.map(c => c.id) ?? []
+  form.servings  = data.servings  ?? 4
+  form.prep_time = data.prep_time ?? null
+  form.cook_time = data.cook_time ?? null
 }
 
 onMounted(async () => {
@@ -309,6 +355,9 @@ async function handleSubmit() {
         unit: i.unit.trim() || undefined,
       })),
     category_ids: form.category_ids,
+    servings:  form.servings  ? parseInt(form.servings, 10)  : 4,
+    prep_time: form.prep_time ? parseInt(form.prep_time, 10) : undefined,
+    cook_time: form.cook_time ? parseInt(form.cook_time, 10) : undefined,
   }
 
   try {
@@ -483,6 +532,16 @@ async function handleSubmit() {
   padding: 10px 14px;
   font-size: 0.875rem;
   margin: 0;
+}
+
+/* ── Temps et portions ── */
+.form-row-3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+@media (max-width: 480px) {
+  .form-row-3 { grid-template-columns: 1fr; }
 }
 
 /* ── Actions ── */
