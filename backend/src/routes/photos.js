@@ -288,12 +288,12 @@ async function handlePhotoUpload(req, res, next) {
 
     // ── Étape 5 : Création d'un brouillon de recette en base (Req. 1.8) ──────
     // La recette est créée avec :
-    //   - name       : nom candidat extrait de l'OCR (peut être vide → remplacé
-    //                  par un nom générique horodaté pour satisfaire la contrainte
-    //                  NOT NULL UNIQUE)
-    //   - instructions: chaîne vide (brouillon, l'utilisateur complétera via PUT)
-    //   - ocr_text   : texte brut retourné par l'OCR (archivé, Req. 1.8)
-    //   - photo_path : chemin relatif du fichier dans /uploads
+    //   - name         : nom candidat extrait de l'OCR ou de Gemini
+    //   - instructions : texte structuré par Gemini, ou chaîne vide (brouillon)
+    //   - prep_time    : extrait par Gemini en minutes, ou NULL (Req. 6.4)
+    //   - cook_time    : extrait par Gemini en minutes, ou NULL (Req. 6.4)
+    //   - ocr_text     : texte brut retourné par l'OCR (archivé, Req. 1.8)
+    //   - photo_path   : chemin relatif du fichier dans /uploads
     //
     // Gestion de l'unicité du nom (contrainte UNIQUE COLLATE NOCASE sur recipes.name) :
     // Si le nom candidat est vide ou dupliqué, on génère un nom générique unique
@@ -302,23 +302,27 @@ async function handlePhotoUpload(req, res, next) {
     const finalName = (structured?.name?.trim()) || suggestedName.trim() || `Recette du ${new Date().toLocaleString('fr-FR')}`;
     let draftName = finalName;
 
+    // Extraction des temps depuis Gemini (NULL si non disponibles — Req. 6.4)
+    const finalPrepTime = structured?.prep_time ?? null;
+    const finalCookTime = structured?.cook_time ?? null;
+
     // Préparer et exécuter l'INSERT avec un prepared statement (Req. 11.1)
     const finalInstructions = structured?.instructions?.trim() || '';
     const insertRecipe = db.prepare(`
-      INSERT INTO recipes (name, instructions, ocr_text, photo_path)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO recipes (name, instructions, prep_time, cook_time, ocr_text, photo_path)
+      VALUES (?, ?, ?, ?, ?, ?)
     `);
 
     let recipeId;
     try {
-      const result = insertRecipe.run(draftName, finalInstructions, ocrText, photoPath);
+      const result = insertRecipe.run(draftName, finalInstructions, finalPrepTime, finalCookTime, ocrText, photoPath);
       recipeId = result.lastInsertRowid;
     } catch (dbErr) {
       // Collision de nom (UNIQUE constraint) très probable si l'utilisateur
       // envoie plusieurs photos rapidement. On retente avec un horodatage précis.
       if (dbErr.code === 'SQLITE_CONSTRAINT_UNIQUE' || dbErr.message?.includes('UNIQUE')) {
         const fallbackName = `Recette ${Date.now()}`;
-        const result = insertRecipe.run(fallbackName, finalInstructions, ocrText, photoPath);
+        const result = insertRecipe.run(fallbackName, finalInstructions, finalPrepTime, finalCookTime, ocrText, photoPath);
         recipeId = result.lastInsertRowid;
       } else {
         // Erreur DB inattendue → nettoyer le fichier et propager l'erreur
@@ -345,5 +349,59 @@ async function handlePhotoUpload(req, res, next) {
     next(err);
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/photos/:filename
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/photos/:filename
+ *
+ * Sert un fichier image depuis le dossier UPLOADS_DIR.
+ *
+ * Sécurité appliquée dans l'ordre :
+ *   1. Path traversal guard : le nom de fichier ne doit pas contenir /, \, ou ..
+ *      (Req. 7.4) — protège contre les attaques de type "../../../etc/passwd"
+ *   2. Extension allowlist : seuls .jpg, .jpeg, .png sont autorisés (Req. 7.6)
+ *   3. File existence check : HTTP 404 si le fichier n'existe pas (Req. 7.3)
+ *   4. Content-Type correct : image/jpeg ou image/png (Req. 7.2)
+ *   5. Authentification X-API-Key héritée de `auth` (Req. 7.5)
+ *
+ * Requirements : 7.1, 7.2, 7.3, 7.4, 7.5, 7.6
+ */
+router.get('/:filename', auth, (req, res, next) => {
+  try {
+    const { filename } = req.params;
+
+    // 1. Path traversal guard (Req. 7.4)
+    // On rejette tout nom contenant un séparateur de chemin (/ ou \)
+    // ou une séquence de montée de répertoire (..).
+    if (/[/\\]|\.\./.test(filename)) {
+      return res.status(400).json({ error: 'Nom de fichier invalide.' });
+    }
+
+    // 2. Extension allowlist (Req. 7.6)
+    // path.extname retourne l'extension avec le point (ex. ".jpg").
+    const ext = path.extname(filename).toLowerCase();
+    if (!['.jpg', '.jpeg', '.png'].includes(ext)) {
+      return res.status(400).json({ error: 'Extension non autorisée.' });
+    }
+
+    // 3. File existence check (Req. 7.3)
+    const fullPath = path.join(uploadsDir, filename);
+    if (!fs.existsSync(fullPath)) {
+      return res.status(404).json({ error: 'Photo introuvable.' });
+    }
+
+    // 4. Serve with correct Content-Type (Req. 7.2)
+    const contentType = ext === '.png' ? 'image/png' : 'image/jpeg';
+    res.setHeader('Content-Type', contentType);
+
+    // res.sendFile requiert un chemin absolu.
+    res.sendFile(fullPath);
+  } catch (err) {
+    next(err);
+  }
+});
 
 module.exports = router;

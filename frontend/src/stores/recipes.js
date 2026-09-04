@@ -61,8 +61,9 @@ export const useRecipesStore = defineStore('recipes', () => {
       if (filters.name)       params.set('name',       filters.name)
       if (filters.ingredient) params.set('ingredient', filters.ingredient)
       if (filters.categories?.length) params.set('categories', filters.categories.join(','))
-      if (filters.page)  params.set('page',  String(filters.page))
-      if (filters.limit) params.set('limit', String(filters.limit))
+      if (filters.page)    params.set('page',     String(filters.page))
+      if (filters.limit)   params.set('limit',    String(filters.limit))
+      if (filters.maxTime) params.set('max_time', String(filters.maxTime))
 
       const query = params.toString() ? `?${params.toString()}` : ''
       const data = await apiFetch(`/api/recipes${query}`)

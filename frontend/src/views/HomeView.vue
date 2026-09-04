@@ -43,6 +43,18 @@
       <!-- Recherche par nom / ingrédient (Req. 7.3, 7.4) -->
       <SearchBar @search="onSearch" />
 
+      <!-- Filtre par temps total (Req. 5.1, 5.2, 5.5) -->
+      <select
+        v-model="maxTime"
+        class="time-filter"
+        aria-label="Filtrer par temps de préparation"
+      >
+        <option :value="null">⏱ Toutes les durées</option>
+        <option :value="30">Moins de 30 min</option>
+        <option :value="60">Moins de 1 h</option>
+        <option :value="120">Moins de 2 h</option>
+      </select>
+
       <!-- Filtre par catégorie (Req. 7.5) -->
       <details class="category-filter">
         <summary class="category-filter-toggle">
@@ -147,6 +159,7 @@ const searchIngredient = ref('')
 const selectedCategories = ref([])
 const currentPage = ref(1)
 const PAGE_SIZE = 20
+const maxTime = ref(null)
 
 // ── Spinner différé (> 500 ms) ──────────────────────────────────────────────
 const showSpinner = ref(false)
@@ -184,6 +197,7 @@ function loadRecipes() {
     categories: selectedCategories.value,
     page: currentPage.value,
     limit: PAGE_SIZE,
+    maxTime: maxTime.value,
   })
 }
 
@@ -205,6 +219,14 @@ function onSearch({ name, ingredient }) {
  * Déclenchée par le watch sur selectedCategories.
  */
 watch(selectedCategories, () => {
+  currentPage.value = 1
+  loadRecipes()
+})
+
+/**
+ * Réagit aux changements de filtre par temps total (Req. 5.1, 5.2, 5.5).
+ */
+watch(maxTime, () => {
   currentPage.value = 1
   loadRecipes()
 })
@@ -437,5 +459,23 @@ details[open] .category-filter-toggle::before {
   font-size: 0.875rem;
   margin-top: 16px;
   text-align: center;
+}
+
+/* ── Time filter ── */
+.time-filter {
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: 0.9375rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  align-self: flex-start;
+}
+
+.time-filter:focus {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 </style>
