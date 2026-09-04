@@ -4,8 +4,8 @@
   "description": "Application personnelle de gestion de recettes de cuisine",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#2d6a4f",
+  "background_color": "#fffbf5",
+  "theme_color": "#c2410c",
   "orientation": "portrait-primary",
   "icons": [
     {
