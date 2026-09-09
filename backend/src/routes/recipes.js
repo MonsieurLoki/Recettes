@@ -44,6 +44,8 @@
 
 'use strict';
 
+const path    = require('path');
+const fs      = require('fs');
 const express = require('express');
 
 const db = require('../db/database');
@@ -710,6 +712,105 @@ router.delete('/:id', (req, res, next) => {
   } catch (err) {
     next(err);
   }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// PUT /api/recipes/:id/photo — Upload ou remplacement de la photo du plat
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * PUT /api/recipes/:id/photo
+ *
+ * Permet d'associer une photo du plat cuisiné à une recette existante.
+ * Contrairement à POST /api/photos, cette route n'exécute pas d'OCR —
+ * elle reçoit directement le fichier, détecte le plat avec Vision,
+ * et met à jour photo_path dans la DB.
+ *
+ * Corps : multipart/form-data avec un champ "photo" (JPEG ou PNG, ≤ 10 Mo)
+ *
+ * Réponse :
+ *   200 — { photo_path: "uploads/..." } — chemin relatif stocké
+ *   400 — format/taille/résolution invalide, ou aucun plat détecté
+ *   404 — recette introuvable
+ *   401 — clé API invalide
+ */
+const multerForDish = require('multer');
+const { validatePhotoFile: validateDishPhoto } = require('../validators/photoValidator');
+const { extractDishFromPhoto: extractDish } = require('../services/dishExtractorService');
+
+// Resolve the uploads directory (same config as in photos.js).
+const uploadsDir = path.resolve(
+  process.env.UPLOADS_DIR || path.join(__dirname, '../../uploads')
+);
+
+const dishStorage = multerForDish.diskStorage({
+  destination(_req, _file, cb) { cb(null, uploadsDir); },
+  filename(_req, file, cb) { cb(null, `${Date.now()}_dish_${file.originalname}`); },
+});
+
+const dishUpload = multerForDish({
+  storage: dishStorage,
+  fileFilter(_req, file, cb) {
+    const allowed = ['image/jpeg', 'image/png'];
+    allowed.includes(file.mimetype)
+      ? cb(null, true)
+      : cb(new multerForDish.MulterError('LIMIT_UNEXPECTED_FILE'), false);
+  },
+  limits: { fileSize: 10 * 1024 * 1024 },
+});
+
+router.put('/:id/photo', (req, res, next) => {
+  dishUpload.single('photo')(req, res, async (multerErr) => {
+    if (multerErr) {
+      return res.status(400).json({ error: 'Fichier invalide ou trop volumineux.' });
+    }
+    const file = req.file;
+    if (!file) {
+      return res.status(400).json({ error: 'Aucun fichier reçu.' });
+    }
+    try {
+      const id = parseInt(req.params.id, 10);
+      if (isNaN(id) || id <= 0) {
+        fs.unlink(file.path, () => {});
+        return res.status(404).json({ error: 'Recette introuvable.' });
+      }
+
+      const existing = db.prepare('SELECT id FROM recipes WHERE id = ?').get(id);
+      if (!existing) {
+        fs.unlink(file.path, () => {});
+        return res.status(404).json({ error: 'Recette introuvable.' });
+      }
+
+      // Valider le fichier (format, taille, résolution)
+      const validation = await validateDishPhoto(file);
+      if (!validation.valid) {
+        fs.unlink(file.path, () => {});
+        return res.status(400).json({ error: validation.error });
+      }
+
+      // Tenter de détecter le plat avec Vision OBJECT_LOCALIZATION.
+      // Si un plat est trouvé → stocker le recadrage.
+      // Si aucun plat → stocker la photo telle quelle (l'utilisateur l'a
+      //   choisie exprès depuis RecipeDetailView, on ne la rejette pas).
+      let photoPath;
+      const croppedPath = await extractDish(file.path);
+      if (croppedPath) {
+        photoPath = path.relative(path.join(__dirname, '../..'), croppedPath).replace(/\\/g, '/');
+      } else {
+        photoPath = path.relative(path.join(__dirname, '../..'), file.path).replace(/\\/g, '/');
+      }
+
+      // Mettre à jour la DB avec le nouveau chemin de photo.
+      db.prepare(
+        `UPDATE recipes SET photo_path = ?, updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now') WHERE id = ?`
+      ).run(photoPath, id);
+
+      return res.status(200).json({ photo_path: photoPath });
+    } catch (err) {
+      fs.unlink(file?.path, () => {});
+      next(err);
+    }
+  });
 });
 
 module.exports = router;

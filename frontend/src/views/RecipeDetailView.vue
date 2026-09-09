@@ -14,13 +14,28 @@
     <!-- Contenu de la recette -->
     <template v-else-if="recipe">
       <!-- Photo header — always shown, placeholder when no photo (Req. 8.1, 8.2) -->
-      <div v-if="!photoError" class="recipe-photo-header">
-        <img
-          :src="photoSrc"
-          :alt="recipe.photo_path ? `Photo de ${recipe.name}` : 'Recette sans photo'"
-          class="recipe-photo-img"
-          @error="photoError = true"
-        />
+      <div class="recipe-photo-wrapper">
+        <div v-if="!photoError" class="recipe-photo-header">
+          <img
+            :src="photoSrc"
+            :alt="recipe.photo_path ? `Photo de ${recipe.name}` : 'Recette sans photo'"
+            class="recipe-photo-img"
+            @error="photoError = true"
+          />
+        </div>
+
+        <!-- Bouton pour uploader ou remplacer la photo du plat -->
+        <label class="btn-upload-photo" :class="{ 'btn-upload-photo--loading': uploadingPhoto }">
+          <input
+            type="file"
+            accept="image/*"
+            class="visually-hidden"
+            :disabled="uploadingPhoto"
+            @change="onDishPhotoChange"
+          />
+          {{ uploadingPhoto ? '⏳ Upload…' : (recipe.photo_path ? '📷 Changer la photo' : '📷 Ajouter une photo du plat') }}
+        </label>
+        <p v-if="uploadPhotoError" class="upload-photo-error" role="alert">{{ uploadPhotoError }}</p>
       </div>
 
       <!-- En-tête -->
@@ -334,6 +349,28 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   releaseWakeLock()
 })
+
+// ── Upload photo du plat ──────────────────────────────────────────────────────
+const uploadingPhoto = ref(false)
+const uploadPhotoError = ref('')
+
+async function onDishPhotoChange(event) {
+  const file = event.target.files?.[0]
+  if (!file || !recipe.value) return
+
+  uploadingPhoto.value = true
+  uploadPhotoError.value = ''
+  try {
+    const result = await recipesStore.uploadDishPhoto(recipe.value.id, file)
+    // Mettre à jour localement pour afficher la nouvelle photo sans rechargement
+    recipe.value = { ...recipe.value, photo_path: result.photo_path }
+    photoError.value = false
+  } catch (err) {
+    uploadPhotoError.value = err.message ?? "Impossible d'uploader la photo."
+  } finally {
+    uploadingPhoto.value = false
+  }
+}
 
 // ── Suppression ───────────────────────────────────────────────────────────────
 function confirmDelete() {
@@ -832,5 +869,64 @@ async function doDelete() {
 
 .notes-actions .btn-secondary:hover {
   background: var(--color-primary-light);
+}
+
+/* ── Photo wrapper ── */
+.recipe-photo-wrapper {
+  margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Remove the margin-bottom from the inner header since wrapper handles it */
+.recipe-photo-wrapper .recipe-photo-header {
+  margin-bottom: 0;
+}
+
+/* ── Upload photo button ── */
+.btn-upload-photo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+  padding: 8px 16px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+  border: 1px dashed var(--color-primary);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  align-self: flex-start;
+  transition: background 0.15s;
+}
+
+.btn-upload-photo:hover {
+  background: #fde8d8;
+}
+
+.btn-upload-photo--loading {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Hide the native file input visually while keeping it accessible */
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.upload-photo-error {
+  color: var(--color-danger);
+  font-size: 0.875rem;
+  margin: 0;
 }
 </style>

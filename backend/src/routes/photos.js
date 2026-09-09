@@ -300,23 +300,27 @@ async function handlePhotoUpload(req, res, next) {
     // Si le nom candidat est vide ou dupliquÃ©, on gÃ©nÃ¨re un nom gÃ©nÃ©rique unique
     // horodatÃ©. Cela garantit que le brouillon est toujours insÃ©rable sans erreur,
     // et l'utilisateur peut renommer la recette lors de l'Ã©dition.
-    // ── Étape 4ter : Dish extraction (optional) ─────────────────────────────
-    // If Vision detects a food object in the photo, we use the cropped version
-    // as the recipe's associated photo. Otherwise we keep the original.
-    // This step is intentionally silent: any failure is swallowed so that the
-    // upload always succeeds with the original photo.
-    let finalPhotoPath = photoPath;
+    // ── Étape 4ter : Extraction du plat ──────────────────────────────────────────
+    // Tente de détecter un plat dans la photo via Vision OBJECT_LOCALIZATION.
+    // Si un plat est trouvé → on stocke le recadrage comme photo de la recette.
+    // Si aucun plat n'est trouvé (photo d'une feuille de recette, texte seul…)
+    // → on stocke NULL dans photo_path : l'image originale n'est pas esthétique
+    //   et le placeholder sera affiché à la place.
+    // En cas d'erreur Vision → on garde la photo originale par sécurité.
+    let finalPhotoPath = null; // null par défaut = pas de plat détecté
     try {
       const croppedPath = await extractDishFromPhoto(file.path);
       if (croppedPath) {
-        // Convert the absolute crop path to a relative path (same convention as photoPath).
+        // Un plat a été détecté et recadré → utiliser le recadrage
         finalPhotoPath = path.relative(
           path.join(__dirname, '../..'),
           croppedPath
         ).replace(/\\/g, '/');
       }
+      // croppedPath === null → aucun plat détecté → finalPhotoPath reste null
     } catch {
-      // Silent — keep the original photo path
+      // Erreur Vision imprévue → conserver la photo originale par sécurité
+      finalPhotoPath = photoPath;
     }
 
         const finalName = (structured?.name?.trim()) || suggestedName.trim() || `Recette du ${new Date().toLocaleString('fr-FR')}`;

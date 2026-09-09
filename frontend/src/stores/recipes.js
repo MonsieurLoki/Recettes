@@ -18,6 +18,7 @@
  *   createRecipe(body)         : créer une nouvelle recette
  *   updateRecipe(id, body)     : mettre à jour une recette existante
  *   deleteRecipe(id)           : supprimer une recette
+ *   uploadDishPhoto(id, file)  : uploader ou remplacer la photo du plat
  *   setPendingPrefill(data)    : stocker les données de pré-remplissage Gemini
  *   clearPendingPrefill()      : effacer les données après utilisation
  */
@@ -169,6 +170,39 @@ export const useRecipesStore = defineStore('recipes', () => {
   }
 
   /**
+   * uploadDishPhoto — Upload ou remplace la photo du plat d'une recette.
+   *
+   * Appelle PUT /api/recipes/:id/photo avec le fichier sélectionné.
+   * Met à jour currentRecipe.photo_path si c'est la recette courante.
+   *
+   * @param {number|string} id   - ID de la recette
+   * @param {File}          file - Fichier image sélectionné par l'utilisateur
+   * @returns {Promise<{ photo_path: string }>}
+   */
+  async function uploadDishPhoto(id, file) {
+    loading.value = true
+    error.value = null
+    try {
+      const formData = new FormData()
+      formData.append('photo', file)
+      const result = await apiFetch(`/api/recipes/${id}/photo`, {
+        method: 'PUT',
+        body: formData,
+      })
+      // Mettre à jour photo_path dans currentRecipe si c'est la recette courante
+      if (currentRecipe.value?.id === id) {
+        currentRecipe.value = { ...currentRecipe.value, photo_path: result.photo_path }
+      }
+      return result
+    } catch (err) {
+      error.value = err.message
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
+  /**
    * setPendingPrefill — Stocke les données Gemini à pré-remplir.
    *
    * Appelé par PhotoCaptureView juste avant la navigation vers RecipeEditView.
@@ -189,5 +223,5 @@ export const useRecipesStore = defineStore('recipes', () => {
     pendingPrefill.value = null
   }
 
-  return { recipes, currentRecipe, total, page, loading, error, pendingPrefill, fetchRecipes, fetchRecipe, createRecipe, updateRecipe, deleteRecipe, setPendingPrefill, clearPendingPrefill }
+  return { recipes, currentRecipe, total, page, loading, error, pendingPrefill, fetchRecipes, fetchRecipe, createRecipe, updateRecipe, deleteRecipe, uploadDishPhoto, setPendingPrefill, clearPendingPrefill }
 })
