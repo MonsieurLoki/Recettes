@@ -22,11 +22,11 @@
       <!-- Gradient accent bar at the top -->
       <div class="card-accent-bar" aria-hidden="true"></div>
 
-      <!-- Thumbnail — only when photo exists (Req. 8.3, 8.4) -->
-      <div v-if="thumbnailSrc" class="card-thumbnail">
+      <!-- Thumbnail — always shown, placeholder when no photo (Req. 8.3, 8.4) -->
+      <div class="card-thumbnail">
         <img
           :src="thumbnailSrc"
-          :alt="`Photo de ${recipe.name}`"
+          :alt="recipe.photo_path ? `Photo de ${recipe.name}` : 'Recette sans photo'"
           class="card-thumb-img"
           @error="thumbnailError = true"
         />
@@ -114,10 +114,12 @@ const thumbnailError = ref(false)
 
 /**
  * thumbnailSrc — Constructs the photo URL from photo_path.
- * Returns null when no photo or after an error, so the <img> is hidden.
+ * Returns the placeholder SVG when no photo is available, null after a load
+ * error so the broken image is hidden rather than showing the placeholder again.
  */
 const thumbnailSrc = computed(() => {
-  if (!props.recipe.photo_path || thumbnailError.value) return null
+  if (thumbnailError.value) return null
+  if (!props.recipe.photo_path) return '/recipe-placeholder.svg'
   const filename = props.recipe.photo_path.split('/').pop()
   return `/api/photos/${filename}`
 })

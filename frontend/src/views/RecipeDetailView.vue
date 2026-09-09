@@ -13,11 +13,11 @@
 
     <!-- Contenu de la recette -->
     <template v-else-if="recipe">
-      <!-- Photo header (Req. 8.1, 8.2) -->
-      <div v-if="photoSrc" class="recipe-photo-header">
+      <!-- Photo header — always shown, placeholder when no photo (Req. 8.1, 8.2) -->
+      <div v-if="!photoError" class="recipe-photo-header">
         <img
           :src="photoSrc"
-          :alt="`Photo de ${recipe.name}`"
+          :alt="recipe.photo_path ? `Photo de ${recipe.name}` : 'Recette sans photo'"
           class="recipe-photo-img"
           @error="photoError = true"
         />
@@ -229,7 +229,8 @@ const instructionSteps = computed(() => {
 // ── Photo header ──────────────────────────────────────────────────────────────
 const photoError = ref(false)
 const photoSrc = computed(() => {
-  if (!recipe.value?.photo_path || photoError.value) return null
+  if (photoError.value) return null
+  if (!recipe.value?.photo_path) return '/recipe-placeholder.svg'
   const filename = recipe.value.photo_path.split('/').pop()
   return `/api/photos/${filename}`
 })

@@ -35,6 +35,7 @@ const { validatePhotoFile } = require('../validators/photoValidator');
 const { extractTextFromImage } = require('../services/ocrService');
 const { extractCandidateName } = require('../services/ocrNameExtractor');
 const { structureRecipeFromOcr } = require('../services/geminiService');
+const { extractDishFromPhoto } = require('../services/dishExtractorService');
 const db                  = require('../db/database');
 
 const router = express.Router();
@@ -299,7 +300,26 @@ async function handlePhotoUpload(req, res, next) {
     // Si le nom candidat est vide ou dupliquÃ©, on gÃ©nÃ¨re un nom gÃ©nÃ©rique unique
     // horodatÃ©. Cela garantit que le brouillon est toujours insÃ©rable sans erreur,
     // et l'utilisateur peut renommer la recette lors de l'Ã©dition.
-    const finalName = (structured?.name?.trim()) || suggestedName.trim() || `Recette du ${new Date().toLocaleString('fr-FR')}`;
+    // ── Étape 4ter : Dish extraction (optional) ─────────────────────────────
+    // If Vision detects a food object in the photo, we use the cropped version
+    // as the recipe's associated photo. Otherwise we keep the original.
+    // This step is intentionally silent: any failure is swallowed so that the
+    // upload always succeeds with the original photo.
+    let finalPhotoPath = photoPath;
+    try {
+      const croppedPath = await extractDishFromPhoto(file.path);
+      if (croppedPath) {
+        // Convert the absolute crop path to a relative path (same convention as photoPath).
+        finalPhotoPath = path.relative(
+          path.join(__dirname, '../..'),
+          croppedPath
+        ).replace(/\\/g, '/');
+      }
+    } catch {
+      // Silent — keep the original photo path
+    }
+
+        const finalName = (structured?.name?.trim()) || suggestedName.trim() || `Recette du ${new Date().toLocaleString('fr-FR')}`;
     let draftName = finalName;
 
     // Extraction des temps depuis Gemini (NULL si non disponibles â€” Req. 6.4)
@@ -315,14 +335,14 @@ async function handlePhotoUpload(req, res, next) {
 
     let recipeId;
     try {
-      const result = insertRecipe.run(draftName, finalInstructions, finalPrepTime, finalCookTime, ocrText, photoPath);
+      const result = insertRecipe.run(draftName, finalInstructions, finalPrepTime, finalCookTime, ocrText, finalPhotoPath);
       recipeId = result.lastInsertRowid;
     } catch (dbErr) {
       // Collision de nom (UNIQUE constraint) trÃ¨s probable si l'utilisateur
       // envoie plusieurs photos rapidement. On retente avec un horodatage prÃ©cis.
       if (dbErr.code === 'SQLITE_CONSTRAINT_UNIQUE' || dbErr.message?.includes('UNIQUE')) {
         const fallbackName = `Recette ${Date.now()}`;
-        const result = insertRecipe.run(fallbackName, finalInstructions, finalPrepTime, finalCookTime, ocrText, photoPath);
+        const result = insertRecipe.run(fallbackName, finalInstructions, finalPrepTime, finalCookTime, ocrText, finalPhotoPath);
         recipeId = result.lastInsertRowid;
       } else {
         // Erreur DB inattendue â†’ nettoyer le fichier et propager l'erreur
